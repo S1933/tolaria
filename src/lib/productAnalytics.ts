@@ -74,14 +74,14 @@ export function trackPdfMarkdownImportCompleted({
   textLength,
 }: {
   mode: PdfMarkdownOcrMode
-  pageCount: number | null
+  pageCount?: number
   pagesOcr: number
   source: PdfMarkdownImportSource
   textLength: number
 }): void {
   trackEvent('pdf_markdown_import_completed', {
     mode,
-    page_count: pageCount,
+    ...(pageCount != null ? { page_count: pageCount } : {}),
     pages_ocr: pagesOcr,
     source,
     text_length_bucket: textLengthBucket(textLength),

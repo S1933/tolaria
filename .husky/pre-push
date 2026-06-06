@@ -65,6 +65,9 @@ ensure_node_tooling() {
 }
 
 require_main_push() {
+  REMOTE_NAME="$1"
+  REMOTE_URL="$2"
+
   if ! git symbolic-ref -q HEAD >/dev/null 2>&1; then
     echo "❌ Pushes must happen from main. Detached HEAD is not allowed."
     exit 1
@@ -85,9 +88,13 @@ require_main_push() {
       refs/tags/*:refs/tags/*)
         ;;
       *)
-        echo "❌ Pushes must be main -> main only."
-        echo "   Attempted: ${LOCAL_REF:-<none>} -> ${REMOTE_REF:-<none>}"
-        exit 1
+        if [ "$REMOTE_NAME" = "fork" ]; then
+          echo "   🔀 Fork push: allowing ${LOCAL_REF} -> ${REMOTE_REF}"
+        else
+          echo "❌ Pushes must be main -> main only."
+          echo "   Attempted: ${LOCAL_REF:-<none>} -> ${REMOTE_REF:-<none>}"
+          exit 1
+        fi
         ;;
     esac
   done <<EOF
@@ -100,7 +107,7 @@ if [ -t 0 ]; then
 else
   PUSH_INPUT=$(cat)
 fi
-require_main_push
+require_main_push "$1" "$2"
 ensure_node_tooling
 ensure_cargo_tooling
 
