@@ -90,4 +90,25 @@ describe('NoteList context menu', () => {
     expect(screen.getByText('Remove from Favorites')).toBeInTheDocument()
     expect(screen.getByText('Mark as Unorganized')).toBeInTheDocument()
   })
+
+  it('offers PDF to Markdown conversion for PDF file rows', () => {
+    const onConvertPdfToMarkdown = vi.fn()
+    const pdfEntry = makeEntry({
+      fileKind: 'binary',
+      filename: 'report.pdf',
+      path: '/vault/attachments/report.pdf',
+      title: 'report.pdf',
+    })
+
+    renderNoteList({
+      allNotesFileVisibility: { images: false, pdfs: true, unsupported: false },
+      entries: [pdfEntry],
+      onConvertPdfToMarkdown,
+    })
+
+    fireEvent.contextMenu(screen.getByText('report.pdf'))
+    fireEvent.click(screen.getByText('Convert to note'))
+
+    expect(onConvertPdfToMarkdown).toHaveBeenCalledWith(pdfEntry)
+  })
 })
