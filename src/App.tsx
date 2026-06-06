@@ -1379,7 +1379,7 @@ function MainApp({ noteWindowParams }: { noteWindowParams: NoteWindowParams | nu
       })
       trackPdfMarkdownImportCompleted({
         mode: ocrMode,
-        pageCount: result.page_count,
+        pageCount: result.page_count ?? undefined,
         pagesOcr: result.pages_ocr,
         source,
         textLength: result.text_length,
