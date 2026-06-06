@@ -100,7 +100,10 @@ fn convert_pdf_to_markdown_note_blocking(
 
     let tools = ExternalToolSet::detect();
     if !tools.pdftotext && ocr_mode != PdfMarkdownOcrMode::OcrAllPages {
-        return Err("PDF text extraction requires pdftotext. Install Poppler to convert this PDF.".to_string());
+        return Err(
+            "PDF text extraction requires pdftotext. Install Poppler to convert this PDF."
+                .to_string(),
+        );
     }
     if requires_ocr(ocr_mode) && !tools.ocr_available() {
         return Err("OCR requires pdftoppm and tesseract. Install Poppler and Tesseract, or use text extraction only.".to_string());
@@ -115,7 +118,13 @@ fn convert_pdf_to_markdown_note_blocking(
         return Err("OCR requires pdfinfo so Tolaria can process pages safely. Install Poppler and try again.".to_string());
     }
 
-    let pages = extract_pages(&pdf_path, ocr_mode, ocr_language.as_deref(), page_count, &tools)?;
+    let pages = extract_pages(
+        &pdf_path,
+        ocr_mode,
+        ocr_language.as_deref(),
+        page_count,
+        &tools,
+    )?;
     let title = title_from_pdf_path(&pdf_path);
     let vault_root = with_boundary(raw_vault_path.as_deref(), |boundary| {
         Ok(boundary.requested_root().to_path_buf())
@@ -136,8 +145,14 @@ fn convert_pdf_to_markdown_note_blocking(
         note_path: note_path.to_string_lossy().to_string(),
         note_title: title,
         page_count,
-        pages_text_extracted: pages.iter().filter(|page| page.source == PageTextSource::Embedded).count() as u32,
-        pages_ocr: pages.iter().filter(|page| page.source == PageTextSource::Ocr).count() as u32,
+        pages_text_extracted: pages
+            .iter()
+            .filter(|page| page.source == PageTextSource::Embedded)
+            .count() as u32,
+        pages_ocr: pages
+            .iter()
+            .filter(|page| page.source == PageTextSource::Ocr)
+            .count() as u32,
         ocr_available: tools.ocr_available(),
         text_length: pages.iter().map(|page| page.text.len()).sum(),
     })
@@ -161,10 +176,7 @@ fn requires_ocr(mode: PdfMarkdownOcrMode) -> bool {
 }
 
 fn command_available(program: &str) -> bool {
-    Command::new(program)
-        .arg("--version")
-        .output()
-        .is_ok()
+    Command::new(program).arg("--version").output().is_ok()
 }
 
 fn command_stdout(program: &str, args: &[String]) -> Result<String, String> {
@@ -232,56 +244,76 @@ fn extract_page(
         let text = ocr_page(path, page_number, language)?;
         return Ok(PageMarkdown {
             page_number,
-            source: if text.trim().is_empty() { PageTextSource::Empty } else { PageTextSource::Ocr },
+            source: if text.trim().is_empty() {
+                PageTextSource::Empty
+            } else {
+                PageTextSource::Ocr
+            },
             text,
         });
     }
 
     Ok(PageMarkdown {
         page_number,
-        source: if embedded.trim().is_empty() { PageTextSource::Empty } else { PageTextSource::Embedded },
+        source: if embedded.trim().is_empty() {
+            PageTextSource::Empty
+        } else {
+            PageTextSource::Embedded
+        },
         text: embedded,
     })
 }
 
 fn extract_all_embedded_text(path: &Path) -> Result<String, String> {
-    command_stdout("pdftotext", &[
-        "-layout".to_string(),
-        "-enc".to_string(),
-        "UTF-8".to_string(),
-        path.to_string_lossy().to_string(),
-        "-".to_string(),
-    ]).map(normalize_extracted_text)
+    command_stdout(
+        "pdftotext",
+        &[
+            "-layout".to_string(),
+            "-enc".to_string(),
+            "UTF-8".to_string(),
+            path.to_string_lossy().to_string(),
+            "-".to_string(),
+        ],
+    )
+    .map(normalize_extracted_text)
 }
 
 fn extract_embedded_text_page(path: &Path, page_number: u32) -> Result<String, String> {
-    command_stdout("pdftotext", &[
-        "-layout".to_string(),
-        "-enc".to_string(),
-        "UTF-8".to_string(),
-        "-f".to_string(),
-        page_number.to_string(),
-        "-l".to_string(),
-        page_number.to_string(),
-        path.to_string_lossy().to_string(),
-        "-".to_string(),
-    ]).map(normalize_extracted_text)
+    command_stdout(
+        "pdftotext",
+        &[
+            "-layout".to_string(),
+            "-enc".to_string(),
+            "UTF-8".to_string(),
+            "-f".to_string(),
+            page_number.to_string(),
+            "-l".to_string(),
+            page_number.to_string(),
+            path.to_string_lossy().to_string(),
+            "-".to_string(),
+        ],
+    )
+    .map(normalize_extracted_text)
 }
 
 fn ocr_page(path: &Path, page_number: u32, language: Option<&str>) -> Result<String, String> {
-    let dir = tempfile::tempdir().map_err(|error| format!("Failed to create OCR temp dir: {error}"))?;
+    let dir =
+        tempfile::tempdir().map_err(|error| format!("Failed to create OCR temp dir: {error}"))?;
     let prefix = dir.path().join("page");
-    command_stdout("pdftoppm", &[
-        "-f".to_string(),
-        page_number.to_string(),
-        "-l".to_string(),
-        page_number.to_string(),
-        "-r".to_string(),
-        "200".to_string(),
-        "-png".to_string(),
-        path.to_string_lossy().to_string(),
-        prefix.to_string_lossy().to_string(),
-    ])?;
+    command_stdout(
+        "pdftoppm",
+        &[
+            "-f".to_string(),
+            page_number.to_string(),
+            "-l".to_string(),
+            page_number.to_string(),
+            "-r".to_string(),
+            "200".to_string(),
+            "-png".to_string(),
+            path.to_string_lossy().to_string(),
+            prefix.to_string_lossy().to_string(),
+        ],
+    )?;
     let image_path = find_rendered_page(dir.path())?;
     let mut args = vec![
         image_path.to_string_lossy().to_string(),
@@ -299,7 +331,11 @@ fn find_rendered_page(dir: &Path) -> Result<PathBuf, String> {
         .map_err(|error| format!("Failed to read OCR temp dir: {error}"))?
         .filter_map(Result::ok)
         .map(|entry| entry.path())
-        .find(|path| path.extension().and_then(OsStr::to_str).is_some_and(|ext| ext.eq_ignore_ascii_case("png")))
+        .find(|path| {
+            path.extension()
+                .and_then(OsStr::to_str)
+                .is_some_and(|ext| ext.eq_ignore_ascii_case("png"))
+        })
         .ok_or_else(|| "PDF page rendering did not produce an image for OCR.".to_string())
 }
 
@@ -355,7 +391,10 @@ fn relative_path_for_markdown(root: &Path, path: &Path) -> Result<String, String
 
 fn unique_note_path(root: &Path, pdf_path: &Path) -> Result<PathBuf, String> {
     let parent = pdf_path.parent().unwrap_or(root);
-    let stem = pdf_path.file_stem().and_then(OsStr::to_str).unwrap_or("Imported PDF");
+    let stem = pdf_path
+        .file_stem()
+        .and_then(OsStr::to_str)
+        .unwrap_or("Imported PDF");
     for index in 0..1000 {
         let filename = if index == 0 {
             format!("{stem}.md")
@@ -380,9 +419,19 @@ struct MarkdownNoteInput<'a> {
 }
 
 fn build_markdown_note(input: MarkdownNoteInput<'_>) -> String {
-    let pages = input.page_count.map_or_else(|| "null".to_string(), |value| value.to_string());
-    let pages_text_extracted = input.pages.iter().filter(|page| page.source == PageTextSource::Embedded).count();
-    let pages_ocr = input.pages.iter().filter(|page| page.source == PageTextSource::Ocr).count();
+    let pages = input
+        .page_count
+        .map_or_else(|| "null".to_string(), |value| value.to_string());
+    let pages_text_extracted = input
+        .pages
+        .iter()
+        .filter(|page| page.source == PageTextSource::Embedded)
+        .count();
+    let pages_ocr = input
+        .pages
+        .iter()
+        .filter(|page| page.source == PageTextSource::Ocr)
+        .count();
     let mut markdown = format!(
         "---\ntype: Note\nsource_pdf: \"{}\"\npdf_import:\n  mode: {}\n  imported_at: \"{}\"\n  pages: {}\n  pages_text_extracted: {}\n  pages_ocr: {}\n---\n\n# {}\n\n[Source PDF]({})\n",
         yaml_escape(input.source_pdf),
@@ -426,21 +475,41 @@ mod tests {
     #[test]
     fn page_quality_rejects_short_or_corrupt_text() {
         assert!(!page_text_is_usable("short"));
-        assert!(!page_text_is_usable(&format!("{}{}", "a".repeat(100), "\u{fffd}".repeat(5))));
-        assert!(page_text_is_usable(&"Readable extracted paragraph. ".repeat(8)));
+        assert!(!page_text_is_usable(&format!(
+            "{}{}",
+            "a".repeat(100),
+            "\u{fffd}".repeat(5)
+        )));
+        assert!(page_text_is_usable(
+            &"Readable extracted paragraph. ".repeat(8)
+        ));
     }
 
     #[test]
     fn markdown_links_wrap_paths_with_spaces() {
-        assert_eq!(markdown_link_target("attachments/report.pdf"), "attachments/report.pdf");
-        assert_eq!(markdown_link_target("attachments/project brief.pdf"), "<attachments/project brief.pdf>");
+        assert_eq!(
+            markdown_link_target("attachments/report.pdf"),
+            "attachments/report.pdf"
+        );
+        assert_eq!(
+            markdown_link_target("attachments/project brief.pdf"),
+            "<attachments/project brief.pdf>"
+        );
     }
 
     #[test]
     fn generated_markdown_keeps_pdf_source_and_pages() {
         let pages = vec![
-            PageMarkdown { page_number: 1, text: "Hello".to_string(), source: PageTextSource::Embedded },
-            PageMarkdown { page_number: 2, text: "Scanned".to_string(), source: PageTextSource::Ocr },
+            PageMarkdown {
+                page_number: 1,
+                text: "Hello".to_string(),
+                source: PageTextSource::Embedded,
+            },
+            PageMarkdown {
+                page_number: 2,
+                text: "Scanned".to_string(),
+                source: PageTextSource::Ocr,
+            },
         ];
         let markdown = build_markdown_note(MarkdownNoteInput {
             title: "Project Brief",
@@ -464,11 +533,18 @@ mod tests {
         let dir = tempfile::TempDir::new().unwrap();
         let pdf = dir.path().join("reports/Project Brief.pdf");
         fs::create_dir_all(pdf.parent().unwrap()).unwrap();
-        fs::write(pdf.parent().unwrap().join("Project Brief.md"), "# Existing\n").unwrap();
+        fs::write(
+            pdf.parent().unwrap().join("Project Brief.md"),
+            "# Existing\n",
+        )
+        .unwrap();
 
         let note = unique_note_path(dir.path(), &pdf).unwrap();
 
-        assert_eq!(note.file_name().and_then(OsStr::to_str), Some("Project Brief 1.md"));
+        assert_eq!(
+            note.file_name().and_then(OsStr::to_str),
+            Some("Project Brief 1.md")
+        );
         assert_eq!(note.parent(), pdf.parent());
     }
 }
